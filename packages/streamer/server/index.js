@@ -6,6 +6,8 @@ import { WebSocketServer, WebSocket } from 'ws';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const DIST_DIR = path.resolve(__dirname, '../dist');
+const LOGGER_DIST_DIR = path.resolve(__dirname, '../../logger/dist');
+const LOGGER_PATH_PREFIX = '/logger';
 const PORT = process.env.PORT ? Number(process.env.PORT) : 8080;
 
 const MIME_TYPES = {
@@ -22,7 +24,33 @@ const MIME_TYPES = {
 
 // HTTP server — serves the built React client from dist/
 const server = http.createServer((req, res) => {
-  const url = req.url === '/' ? '/index.html' : req.url;
+  const reqUrl = req.url ?? '/';
+
+  // Serve the logger package from /logger/
+  if (reqUrl === LOGGER_PATH_PREFIX || reqUrl.startsWith(LOGGER_PATH_PREFIX + '/')) {
+    const suffix = reqUrl.slice(LOGGER_PATH_PREFIX.length) || '/index.js';
+    const safeSuffix = path.normalize(suffix.split('?')[0]);
+    const filePath = path.join(LOGGER_DIST_DIR, safeSuffix);
+    if (!filePath.startsWith(LOGGER_DIST_DIR + path.sep) && filePath !== LOGGER_DIST_DIR) {
+      res.writeHead(400, { 'Content-Type': 'text/plain' });
+      res.end('Bad request');
+      return;
+    }
+    const ext = path.extname(filePath);
+    const contentType = MIME_TYPES[ext] ?? 'text/plain';
+    fs.readFile(filePath, (err, data) => {
+      if (err) {
+        res.writeHead(404, { 'Content-Type': 'text/plain' });
+        res.end('Not found');
+      } else {
+        res.writeHead(200, { 'Content-Type': contentType });
+        res.end(data);
+      }
+    });
+    return;
+  }
+
+  const url = reqUrl === '/' ? '/index.html' : reqUrl;
   // Resolve and validate the path to prevent directory traversal
   const safeSuffix = path.normalize(url.split('?')[0]);
   const filePath = path.join(DIST_DIR, safeSuffix);
