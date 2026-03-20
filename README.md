@@ -1,92 +1,90 @@
 # NoConsole
 
-A beautiful, real-time WebSocket-based logging system with AI-powered log analysis.
+A real-time WebSocket-based log streaming system with AI-powered analysis.
 
-## 🌟 Features
+## 📦 Packages
 
-- **WebSocket Logger Library** (`@noconsole/logger`)
-  - Drop-in replacement for browser `console` API
-  - Sends structured log messages over WebSocket
-  - Dependency injection for WebSocket instance
-  - Graceful fallback when disconnected
-  - Full TypeScript support
+### `@noconsole/logger`
 
-- **Beautiful Web Client** (`@noconsole/client`)
-  - Dark-themed, terminal-style interface
-  - Real-time log streaming with pause/resume
-  - Virtualized rendering for excellent performance (thousands of logs)
-  - Advanced filtering (by level, text search with highlight)
-  - AI-powered log analysis using Ollama
-  - Export logs as JSON
-  - Auto-scroll with manual override
-
-## 📦 Monorepo Structure
-
-```
-noconsole/
-├── packages/
-│   ├── logger/          # TypeScript logger library
-│   └── client/          # Vite + React web client
-└── package.json         # Workspace configuration
-```
-
-## 🚀 Quick Start
-
-### 1. Install Dependencies
-
-```bash
-npm install
-```
-
-### 2. Build Packages
-
-```bash
-npm run build
-```
-
-### 3. Run the Client
-
-```bash
-npm run dev
-```
-
-The client will start at `http://localhost:5173` and attempt to connect to a WebSocket server at `ws://localhost:8080`.
-
-## 📚 Usage
-
-### Using the Logger Library
+Drop-in replacement for the browser `console` API that routes all output over a WebSocket.
 
 ```typescript
 import { WebSocketLogger } from '@noconsole/logger';
 
-// Create WebSocket connection
 const ws = new WebSocket('ws://localhost:8080');
-
-// Create logger instance
 const logger = new WebSocketLogger(ws);
 
-// Use like normal console
 logger.log('Hello world!', { foo: 'bar' });
-logger.warn('This is a warning');
-logger.error('Error occurred:', new Error('Oops'));
-logger.info('Information message');
-logger.debug('Debug details', [1, 2, 3]);
-
-// All standard console methods supported:
-logger.time('operation');
-// ... do work ...
-logger.timeEnd('operation');
-
-logger.count('clicks');
-logger.table([{ name: 'Alice', age: 30 }]);
-logger.group('Group Title');
-logger.log('Inside group');
-logger.groupEnd();
+logger.warn('High memory', { usage: '92%' });
+logger.error('Unhandled rejection', err);
+// Sends: { type, args, timestamp, id }
 ```
 
-### Log Message Format
+- Full `Console` interface (`log`, `warn`, `error`, `info`, `debug`, `time`/`timeEnd`, `count`, `table`, `group`, …)
+- `WebSocket | null` — caller owns the socket lifecycle
+- Silent no-op when socket is null or not `OPEN`
+- Full TypeScript support
 
-Each log message sent over WebSocket has this structure:
+### `@noconsole/streamer`
+
+All-in-one viewer: a WebSocket broadcast server **plus** the React web client in a single package.
+
+#### Server (`packages/streamer/server/index.js`)
+
+Minimal WebSocket server that accepts connections from `@noconsole/logger` instances and broadcasts each message to all connected viewer clients.
+
+```bash
+npm run server --workspace=packages/streamer
+# or
+node packages/streamer/server/index.js
+```
+
+Listens on `ws://localhost:8080` by default (override with `PORT=…`).
+
+#### Client (React + Vite)
+
+Real-time log viewer served at `http://localhost:5173` in dev mode.
+
+- **Virtualized list** (`@tanstack/react-virtual`) — handles thousands of entries without degradation
+- **Level filters**: All / Log / Info / Warn / Error / Debug
+- **Search**: real-time substring match with inline highlight; case-sensitivity toggle
+- **Pause/Resume**: buffers up to 10k logs while paused, flushes on resume
+- **Auto-scroll** with smart manual override
+- **AI Analysis panel**: streams logs to a local [Ollama](https://ollama.com) instance, response parsed into Errors / Warnings / Performance / Recommendations
+- Export logs as JSON
+
+## 🗂️ Monorepo Structure
+
+```
+noconsole/
+├── packages/
+│   ├── logger/          # @noconsole/logger — WebSocket logger library
+│   └── streamer/        # @noconsole/streamer — WS server + React viewer
+│       └── server/      #   broadcast server (Node.js)
+└── package.json         # workspace root
+```
+
+## 🚀 Quick Start
+
+```bash
+# 1. Install all dependencies
+npm install
+
+# 2. Build all packages
+npm run build
+
+# 3a. Start the broadcast server
+npm run server
+
+# 3b. In another terminal, start the dev viewer (client + server together)
+npm run dev
+```
+
+`npm run dev` inside `packages/streamer` starts both the WS server and the Vite dev server concurrently via `concurrently`.
+
+## 🏗️ Architecture
+
+### Log Message Format
 
 ```typescript
 interface LogMessage {
@@ -97,117 +95,46 @@ interface LogMessage {
 }
 ```
 
-Example:
-```json
-{
-  "type": "error",
-  "args": ["Failed to fetch", { "status": 404 }],
-  "timestamp": 1710932400000,
-  "id": "a1b2c3d4e"
-}
-```
-
-## 🎨 Client Features
-
-### Filtering
-- Filter by log level (log, info, warn, error, debug)
-- Text search with real-time highlighting
-- Case-sensitive search toggle
-
-### Controls
-- **Pause/Resume**: Stop receiving new logs temporarily
-- **Clear**: Remove all logs from view
-- **Export**: Download logs as JSON file
-- **AI Analysis**: Analyze logs with Ollama (requires local Ollama installation)
-
-### AI Analysis
-
-The client can send logs to a local Ollama instance for intelligent analysis:
-
-1. Install [Ollama](https://ollama.ai/)
-2. Pull a model: `ollama pull llama3.2`
-3. Start Ollama (it runs on `http://localhost:11434` by default)
-4. Click "AI Analysis" in the client
-5. Select your model and click "Analyze Logs"
-
-The AI will categorize findings into:
-- **Errors**: Detected errors and their causes
-- **Warnings**: Potential issues
-- **Performance**: Performance-related concerns
-- **Recommendations**: Actionable improvements
-
-## 🛠️ Development
-
-### Project Commands
-
-```bash
-# Install dependencies
-npm install
-
-# Build all packages
-npm run build
-
-# Run client in dev mode
-npm run dev
-
-# Run tests (if available)
-npm test
-```
-
-### Package-Specific Commands
-
-**Logger:**
-```bash
-cd packages/logger
-npm run build
-npm test
-```
-
-**Client:**
-```bash
-cd packages/client
-npm run dev
-npm run build
-npm run preview
-```
-
-## 🏗️ Architecture
-
 ### Logger Package
 
-- **WebSocketLogger.ts**: Main logger class implementing Console interface
-- **index.ts**: Public API exports
-- **index.test.ts**: Jest tests
+- `WebSocketLogger.ts` — implements the Console interface
+- `index.ts` — public API
+- `index.test.ts` — Jest tests
 
-Built with TypeScript, outputs to `dist/` with type declarations.
+### Streamer Package
 
-### Client Package
+- `server/index.js` — Node.js WebSocket broadcast server
+- `src/` — React + TypeScript viewer
+  - **Hooks**: `useWebSocket` (connection + log state), `useLLM` (Ollama)
+  - **Components**: `Header`, `FilterBar`, `LogViewer`, `LogRow`, `LLMPanel`
 
-- **Components**:
-  - `Header`: Top bar with connection status and controls
-  - `FilterBar`: Level filters and search
-  - `LogViewer`: Virtualized log display
-  - `LogRow`: Individual log entry rendering
-  - `LLMPanel`: AI analysis sidebar
-  - `StatusBar`: WebSocket connection indicator
+## 🛠️ Commands
 
-- **Hooks**:
-  - `useWebSocket`: Manages WebSocket connection and log state
-  - `useLLM`: Handles Ollama API communication
+```bash
+# Root
+npm install           # install all workspace dependencies
+npm run build         # build all packages
+npm run dev           # start streamer dev server (WS + Vite)
+npm run server        # start WS broadcast server only
+npm test              # run logger tests
 
-- **Tech Stack**:
-  - React 18
-  - TypeScript
-  - Vite (build tool)
-  - TailwindCSS (styling)
-  - @tanstack/react-virtual (virtualization)
+# packages/logger
+npm run build
+npm test
+
+# packages/streamer
+npm run dev           # WS server + Vite (concurrent)
+npm run build         # production build
+npm run server:start  # WS server only
+```
+
+## 🤖 AI Analysis
+
+1. Install [Ollama](https://ollama.ai/) and pull a model: `ollama pull llama3.2`
+2. Start Ollama (`http://localhost:11434`)
+3. Click **AI Analysis** in the viewer
+4. Select your model and click **Analyze Logs**
 
 ## 📄 License
 
 MIT
-
-## 🤝 Contributing
-
-Contributions welcome! Please feel free to submit issues or pull requests.
-
-Not a console logger

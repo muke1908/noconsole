@@ -1,15 +1,15 @@
-const WebSocket = require('ws');
+import { WebSocketServer, WebSocket } from 'ws';
 
-const wss = new WebSocket.Server({ port: 8080 });
+const PORT = process.env.PORT ? Number(process.env.PORT) : 8080;
 
-console.log('WebSocket server started on ws://localhost:8080');
+const wss = new WebSocketServer({ port: PORT });
+
+console.log(`WebSocket server started on ws://localhost:${PORT}`);
 
 wss.on('connection', (ws) => {
   console.log('Client connected');
 
   ws.on('message', (message) => {
-    console.log('Received:', message.toString());
-    
     // Broadcast to all connected clients
     wss.clients.forEach((client) => {
       if (client.readyState === WebSocket.OPEN) {
@@ -29,8 +29,8 @@ wss.on('connection', (ws) => {
   // Send a welcome message
   ws.send(JSON.stringify({
     type: 'info',
-    args: ['Connected to WebSocket server'],
+    args: ['Connected to NoConsole streamer'],
     timestamp: Date.now(),
-    id: crypto.randomUUID()
+    id: crypto.randomUUID(),
   }));
 });

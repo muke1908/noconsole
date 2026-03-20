@@ -1,6 +1,8 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import type { LogMessage, ConnectionStatus } from '../types';
 
+const MAX_PAUSED_LOGS = 10000;
+
 export function useWebSocket(url: string) {
   const [logs, setLogs] = useState<LogMessage[]>([]);
   const [status, setStatus] = useState<ConnectionStatus>('disconnected');
@@ -11,8 +13,6 @@ export function useWebSocket(url: string) {
   // the current value without needing to be in the connect() closure.
   // Without this, toggling pause would force a reconnect and lose in-flight messages.
   const isPausedRef = useRef(false);
-
-  const MAX_PAUSED_LOGS = 10000;
 
   const connect = useCallback(() => {
     try {
