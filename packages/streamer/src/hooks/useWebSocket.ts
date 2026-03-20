@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import type { LogMessage, ConnectionStatus } from '../types';
 
 const MAX_PAUSED_LOGS = 10000;
+const textDecoder = new TextDecoder();
 
 export function useWebSocket(url: string) {
   const [logs, setLogs] = useState<LogMessage[]>([]);
@@ -17,6 +18,10 @@ export function useWebSocket(url: string) {
   const connect = useCallback(() => {
     try {
       const ws = new WebSocket(url);
+      // Receive binary frames as ArrayBuffer instead of Blob so we can decode
+      // them synchronously; the server always sends text frames but this guards
+      // against any intermediary that converts them.
+      ws.binaryType = 'arraybuffer';
       
       ws.onopen = () => {
         setStatus('connected');
@@ -24,8 +29,15 @@ export function useWebSocket(url: string) {
 
       ws.onmessage = (event) => {
         try {
-          const raw = event.data;
-          if (typeof raw !== 'string' || !raw.trim().startsWith('{')) {
+          let raw: string;
+          if (typeof event.data === 'string') {
+            raw = event.data;
+          } else if (event.data instanceof ArrayBuffer) {
+            raw = textDecoder.decode(event.data);
+          } else {
+            return;
+          }
+          if (!raw.trim().startsWith('{')) {
             return;
           }
           const message: LogMessage = JSON.parse(raw);

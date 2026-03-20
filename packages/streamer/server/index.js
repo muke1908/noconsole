@@ -64,11 +64,13 @@ server.listen(PORT, () => {
 wss.on('connection', (ws) => {
   console.log('Client connected');
 
-  ws.on('message', (message) => {
-    // Broadcast to all connected clients
+  ws.on('message', (message, isBinary) => {
+    // Always relay as a UTF-8 text frame so browser clients receive a string,
+    // not a Blob/ArrayBuffer (which happens when a raw Buffer is forwarded).
+    const text = isBinary ? message.toString('utf8') : message.toString();
     wss.clients.forEach((client) => {
       if (client.readyState === WebSocket.OPEN) {
-        client.send(message);
+        client.send(text);
       }
     });
   });
