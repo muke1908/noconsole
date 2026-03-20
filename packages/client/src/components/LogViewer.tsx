@@ -43,31 +43,34 @@ export function LogViewer({ logs, filter }: LogViewerProps) {
   const virtualizer = useVirtualizer({
     count: filteredLogs.length,
     getScrollElement: () => parentRef.current,
-    estimateSize: () => 60,
-    overscan: 5,
+    estimateSize: () => 40,
+    overscan: 10,
   });
 
+  // Auto-scroll: use the virtualizer's scrollToIndex so virtual positions are respected
   useEffect(() => {
-    if (autoScroll && parentRef.current) {
-      const scrollHeight = parentRef.current.scrollHeight;
-      parentRef.current.scrollTop = scrollHeight;
+    if (autoScroll && filteredLogs.length > 0) {
+      virtualizer.scrollToIndex(filteredLogs.length - 1, { align: 'end' });
     }
-  }, [filteredLogs, autoScroll]);
+  }, [filteredLogs.length, autoScroll, virtualizer]);
 
   const handleScroll = () => {
     if (!parentRef.current) return;
     
     const { scrollTop, scrollHeight, clientHeight } = parentRef.current;
-    const isAtBottom = scrollHeight - scrollTop - clientHeight < 50;
+    const isAtBottom = scrollHeight - scrollTop - clientHeight < 80;
     setAutoScroll(isAtBottom);
   };
 
   return (
-    <div className="flex-1 flex flex-col overflow-hidden">
+    // min-h-0 is critical: flex children don't shrink below their content size
+    // by default. Without it, the scroll container never gets a bounded height
+    // and the virtualizer has nothing to scroll within.
+    <div className="flex-1 flex flex-col overflow-hidden min-h-0">
       <div 
         ref={parentRef}
         onScroll={handleScroll}
-        className="flex-1 overflow-auto bg-[#0d1117]"
+        className="flex-1 overflow-y-auto overflow-x-hidden bg-[#0d1117] min-h-0"
       >
         {filteredLogs.length === 0 ? (
           <div className="flex items-center justify-center h-full text-gray-500">
@@ -89,6 +92,8 @@ export function LogViewer({ logs, filter }: LogViewerProps) {
               return (
                 <div
                   key={log.id}
+                  data-index={virtualRow.index}
+                  ref={virtualizer.measureElement}
                   style={{
                     position: 'absolute',
                     top: 0,
@@ -110,12 +115,12 @@ export function LogViewer({ logs, filter }: LogViewerProps) {
       </div>
 
       {!autoScroll && (
-        <div className="absolute bottom-4 right-4">
+        <div className="absolute bottom-4 right-4 z-10">
           <button
             onClick={() => {
               setAutoScroll(true);
-              if (parentRef.current) {
-                parentRef.current.scrollTop = parentRef.current.scrollHeight;
+              if (filteredLogs.length > 0) {
+                virtualizer.scrollToIndex(filteredLogs.length - 1, { align: 'end' });
               }
             }}
             className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md shadow-lg font-medium transition-colors flex items-center gap-2"

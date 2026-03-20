@@ -7,6 +7,10 @@ export function useWebSocket(url: string) {
   const [isPaused, setIsPaused] = useState(false);
   const wsRef = useRef<WebSocket | null>(null);
   const pausedLogsRef = useRef<LogMessage[]>([]);
+  // Track isPaused in a ref so the WebSocket message handler always reads
+  // the current value without needing to be in the connect() closure.
+  // Without this, toggling pause would force a reconnect and lose in-flight messages.
+  const isPausedRef = useRef(false);
 
   const MAX_PAUSED_LOGS = 10000;
 
@@ -20,9 +24,17 @@ export function useWebSocket(url: string) {
 
       ws.onmessage = (event) => {
         try {
-          const message: LogMessage = JSON.parse(event.data);
-          
-          if (isPaused) {
+          const raw = event.data;
+          if (typeof raw !== 'string' || !raw.trim().startsWith('{')) {
+            return;
+          }
+          const message: LogMessage = JSON.parse(raw);
+          // Validate the message has the required fields
+          if (!message.type || !Array.isArray(message.args) || typeof message.timestamp !== 'number') {
+            return;
+          }
+
+          if (isPausedRef.current) {
             if (pausedLogsRef.current.length >= MAX_PAUSED_LOGS) {
               pausedLogsRef.current.shift();
             }
@@ -31,7 +43,7 @@ export function useWebSocket(url: string) {
             setLogs(prev => [...prev, message]);
           }
         } catch (error) {
-          console.error('Failed to parse log message:', error);
+          // Silently drop unparseable messages
         }
       };
 
@@ -52,7 +64,7 @@ export function useWebSocket(url: string) {
     } catch (error) {
       setStatus('error');
     }
-  }, [url, isPaused]);
+  }, [url]);
 
   useEffect(() => {
     connect();
@@ -64,6 +76,11 @@ export function useWebSocket(url: string) {
       }
     };
   }, [connect]);
+
+  // Keep isPausedRef in sync with the isPaused state
+  useEffect(() => {
+    isPausedRef.current = isPaused;
+  }, [isPaused]);
 
   const togglePause = useCallback(() => {
     setIsPaused(prev => {
