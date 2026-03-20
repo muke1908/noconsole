@@ -3,11 +3,10 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
-    "dev": "concurrently \"npm run server\" \"vite\"",
+    "dev": "concurrently \"node server/index.js\" \"vite\"",
     "build": "tsc && vite build",
     "preview": "vite preview",
-    "server": "node server/index.js",
-    "server:start": "node server/index.js"
+    "start": "node server/index.js"
   },
   "dependencies": {
     "@tanstack/react-virtual": "^3.0.1",

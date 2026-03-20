@@ -6,7 +6,8 @@ import { LogViewer } from './components/LogViewer';
 import { LLMPanel } from './components/LLMPanel';
 import type { FilterState, LogLevel } from './types';
 
-const DEFAULT_WS_URL = 'ws://localhost:8080';
+const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+const DEFAULT_WS_URL = `${wsProtocol}//${window.location.host}`;
 
 function App() {
   const { logs, status, isPaused, togglePause, clearLogs } = useWebSocket(DEFAULT_WS_URL);
