@@ -23,13 +23,10 @@ export function useWebSocket(url: string) {
           const message: LogMessage = JSON.parse(event.data);
           
           if (isPaused) {
-            if (pausedLogsRef.current.length < MAX_PAUSED_LOGS) {
-              pausedLogsRef.current.push(message);
-            } else {
-              // Drop oldest logs when limit reached
+            if (pausedLogsRef.current.length >= MAX_PAUSED_LOGS) {
               pausedLogsRef.current.shift();
-              pausedLogsRef.current.push(message);
             }
+            pausedLogsRef.current.push(message);
           } else {
             setLogs(prev => [...prev, message]);
           }

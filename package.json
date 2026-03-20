@@ -10,5 +10,8 @@
     "dev": "npm run dev --workspace=packages/client",
     "test": "npm run test --workspaces --if-present"
   },
-  "devDependencies": {}
+  "devDependencies": {
+    "@babel/preset-typescript": "^7.28.5",
+    "ts-jest": "^29.4.6"
+  }
 }

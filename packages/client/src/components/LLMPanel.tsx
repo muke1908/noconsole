@@ -9,7 +9,7 @@ interface LLMPanelProps {
 }
 
 export function LLMPanel({ logs, isOpen, onClose }: LLMPanelProps) {
-  const [model, setModel] = useState('llama3.2');
+  const [model, setModel] = useState('llama3');
   const { analyze, isAnalyzing, analysis, error } = useLLM();
 
   if (!isOpen) return null;
@@ -37,7 +37,7 @@ export function LLMPanel({ logs, isOpen, onClose }: LLMPanelProps) {
           onChange={(e) => setModel(e.target.value)}
           className="w-full px-3 py-2 bg-[#0d1117] border border-gray-700 rounded-md text-white focus:outline-none focus:border-blue-500"
         >
-          <option value="llama3.2">llama3.2</option>
+          <option value="llama3">llama3</option>
           <option value="llama2">llama2</option>
           <option value="mistral">mistral</option>
           <option value="codellama">codellama</option>

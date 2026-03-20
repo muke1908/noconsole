@@ -6,7 +6,7 @@ export function useLLM(baseUrl: string = 'http://localhost:11434') {
   const [analysis, setAnalysis] = useState<LLMAnalysis | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const analyze = useCallback(async (logs: LogMessage[], model: string = 'llama3.2') => {
+  const analyze = useCallback(async (logs: LogMessage[], model: string = 'llama3') => {
     setIsAnalyzing(true);
     setError(null);
     setAnalysis(null);
