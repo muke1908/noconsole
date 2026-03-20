@@ -1,24 +1,32 @@
 import { describe, it, expect, beforeEach, jest } from '@jest/globals';
 import { WebSocketLogger } from './index.js';
 
+const mockSend = jest.fn();
+const mockWs = {
+  readyState: 1, // WebSocket.OPEN
+  send: mockSend,
+};
+
+// Mock the global WebSocket constructor
+(global as any).WebSocket = jest.fn(() => mockWs);
+(global as any).WebSocket.OPEN = 1;
+
 describe('WebSocketLogger', () => {
   let logger: WebSocketLogger;
-  let mockWs: any;
 
   beforeEach(() => {
-    mockWs = {
-      readyState: 1, // WebSocket.OPEN
-      send: jest.fn()
-    };
-    logger = new WebSocketLogger(mockWs);
+    mockSend.mockClear();
+    (global as any).WebSocket.mockClear();
+    mockWs.readyState = 1;
+    logger = new WebSocketLogger('wss://localhost:8080');
   });
 
   it('should send log message over WebSocket', () => {
     logger.log('test message', 123);
-    
-    expect(mockWs.send).toHaveBeenCalledTimes(1);
-    const sentData = JSON.parse(mockWs.send.mock.calls[0][0]);
-    
+
+    expect(mockSend).toHaveBeenCalledTimes(1);
+    const sentData = JSON.parse(mockSend.mock.calls[0][0] as string);
+
     expect(sentData.type).toBe('log');
     expect(sentData.args).toEqual(['test message', 123]);
     expect(sentData.timestamp).toBeGreaterThan(0);
@@ -30,12 +38,13 @@ describe('WebSocketLogger', () => {
     logger.error('error');
     logger.info('info');
     logger.debug('debug');
-    
-    expect(mockWs.send).toHaveBeenCalledTimes(4);
+
+    expect(mockSend).toHaveBeenCalledTimes(4);
   });
 
-  it('should gracefully handle disconnected WebSocket', () => {
-    const disconnectedLogger = new WebSocketLogger(null);
-    expect(() => disconnectedLogger.log('test')).not.toThrow();
+  it('should not throw when WebSocket is not open', () => {
+    mockWs.readyState = 3; // WebSocket.CLOSED
+    expect(() => logger.log('test')).not.toThrow();
+    expect(mockSend).not.toHaveBeenCalled();
   });
 });

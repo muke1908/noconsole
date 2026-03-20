@@ -10,7 +10,7 @@ export class WebSocketLogger implements Console {
   private timers: Map<string, number> = new Map();
   private counters: Map<string, number> = new Map();
 
-  constructor(url: URL) {
+  constructor(url: string | URL) {
     this.ws = new WebSocket(url);
   }
 
