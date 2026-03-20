@@ -6,16 +6,12 @@ export interface LogMessage {
 }
 
 export class WebSocketLogger implements Console {
-  private ws: WebSocket | null;
+  private ws: WebSocket;
   private timers: Map<string, number> = new Map();
   private counters: Map<string, number> = new Map();
 
-  constructor(ws: WebSocket | null = null) {
-    this.ws = ws;
-  }
-
-  setWebSocket(ws: WebSocket | null) {
-    this.ws = ws;
+  constructor(url: URL) {
+    this.ws = new WebSocket(url);
   }
 
   private send(type: LogMessage['type'], ...args: any[]) {

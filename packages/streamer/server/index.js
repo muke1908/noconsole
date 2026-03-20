@@ -24,6 +24,7 @@ const MIME_TYPES = {
 
 // HTTP server — serves the built React client from dist/
 const server = http.createServer((req, res) => {
+  res.setHeader('Access-Control-Allow-Origin', '*');
   const reqUrl = req.url ?? '/';
 
   // Serve the logger package from /logger/
