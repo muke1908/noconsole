@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>NoConsole Logger Example</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      max-width: 800px;
+      margin: 50px auto;
+      padding: 20px;
+      background: #f5f5f5;
+    }
+    h1 {
+      color: #333;
+    }
+    .controls {
+      background: white;
+      padding: 20px;
+      border-radius: 8px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    button {
+      margin: 5px;
+      padding: 10px 20px;
+      background: #007bff;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 14px;
+    }
+    button:hover {
+      background: #0056b3;
+    }
+    .status {
+      padding: 10px;
+      margin: 10px 0;
+      border-radius: 4px;
+      font-weight: bold;
+    }
+    .connected {
+      background: #d4edda;
+      color: #155724;
+    }
+    .disconnected {
+      background: #f8d7da;
+      color: #721c24;
+    }
+    .info {
+      margin-top: 20px;
+      padding: 15px;
+      background: #d1ecf1;
+      border-left: 4px solid #0c5460;
+      color: #0c5460;
+    }
+  </style>
+</head>
+<body>
+  <h1>NoConsole Logger Example</h1>
+  
+  <div id="status" class="status disconnected">Disconnected</div>
+  
+  <div class="controls">
+    <h2>Send Test Logs</h2>
+    <button onclick="sendLog()">Log Message</button>
+    <button onclick="sendInfo()">Info Message</button>
+    <button onclick="sendWarn()">Warning</button>
+    <button onclick="sendError()">Error</button>
+    <button onclick="sendDebug()">Debug</button>
+    <button onclick="sendMultiple()">Send Multiple</button>
+    <button onclick="sendObject()">Log Object</button>
+  </div>
+
+  <div class="info">
+    <strong>Instructions:</strong>
+    <ol>
+      <li>Make sure the WebSocket server is running: <code>node examples/server.js</code></li>
+      <li>Make sure the client is running: <code>npm run dev</code></li>
+      <li>Open the client in another tab: <code>http://localhost:5173</code></li>
+      <li>Click the buttons above to send test logs</li>
+      <li>Watch them appear in the NoConsole client!</li>
+    </ol>
+  </div>
+
+  <script type="module">
+    import { WebSocketLogger } from '../packages/logger/dist/index.js';
+
+    const ws = new WebSocket('ws://localhost:8080');
+    const logger = new WebSocketLogger(ws);
+
+    const statusEl = document.getElementById('status');
+
+    ws.onopen = () => {
+      statusEl.textContent = 'Connected to WebSocket';
+      statusEl.className = 'status connected';
+      logger.info('Example page connected!');
+    };
+
+    ws.onclose = () => {
+      statusEl.textContent = 'Disconnected';
+      statusEl.className = 'status disconnected';
+    };
+
+    ws.onerror = () => {
+      statusEl.textContent = 'Connection Error';
+      statusEl.className = 'status disconnected';
+    };
+
+    window.sendLog = () => {
+      logger.log('This is a regular log message', new Date().toISOString());
+    };
+
+    window.sendInfo = () => {
+      logger.info('Information: User clicked the info button');
+    };
+
+    window.sendWarn = () => {
+      logger.warn('Warning: This operation might be slow', { retryCount: 3 });
+    };
+
+    window.sendError = () => {
+      logger.error('Error: Failed to fetch data', { status: 404, url: '/api/users' });
+    };
+
+    window.sendDebug = () => {
+      logger.debug('Debug info:', { memory: '125MB', cpu: '45%' });
+    };
+
+    window.sendMultiple = () => {
+      for (let i = 1; i <= 10; i++) {
+        logger.log(`Message ${i} of 10`);
+      }
+    };
+
+    window.sendObject = () => {
+      logger.log('User object:', {
+        id: 12345,
+        name: 'John Doe',
+        email: 'john@example.com',
+        preferences: {
+          theme: 'dark',
+          notifications: true
+        }
+      });
+    };
+  </script>
+</body>
+</html>
