@@ -10,9 +10,7 @@ Drop-in replacement for the browser `console` API that routes all output over a 
 
 ```typescript
 import { WebSocketLogger } from '@noconsole/logger';
-
-const ws = new WebSocket('ws://localhost:8080');
-const logger = new WebSocketLogger(ws);
+const logger = new WebSocketLogger('ws://localhost:8080');
 
 logger.log('Hello world!', { foo: 'bar' });
 logger.warn('High memory', { usage: '92%' });
