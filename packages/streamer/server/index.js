@@ -22,6 +22,15 @@ const MIME_TYPES = {
   '.woff2': 'font/woff2',
 };
 
+// Namespace management
+// Map from namespace UUID → Set of viewer WebSocket connections
+const namespaceViewers = new Map();
+// Set of namespace UUIDs that currently have an active logger connection
+const activeLoggers = new Set();
+
+// UUID pattern used to identify viewer connections by URL path
+const UUID_PATH_RE = /^\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\/?$/i;
+
 // HTTP server — serves the built React client from dist/
 const server = http.createServer((req, res) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -48,6 +57,13 @@ const server = http.createServer((req, res) => {
         res.end(data);
       }
     });
+    return;
+  }
+
+  // Return the list of namespaces that currently have an active logger
+  if (reqUrl === '/api/namespaces') {
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify([...activeLoggers]));
     return;
   }
 
@@ -90,33 +106,85 @@ server.listen(PORT, () => {
   console.log(`WebSocket endpoint:            ws://localhost:${PORT}`);
 });
 
-wss.on('connection', (ws) => {
-  console.log('Client connected');
+wss.on('connection', (ws, req) => {
+  const urlPath = (req.url ?? '/').split('?')[0];
+  const uuidMatch = urlPath.match(UUID_PATH_RE);
 
-  ws.on('message', (message, isBinary) => {
-    // Always relay as a UTF-8 text frame so browser clients receive a string,
-    // not a Blob/ArrayBuffer (which happens when a raw Buffer is forwarded).
-    const text = isBinary ? message.toString('utf8') : message.toString();
-    wss.clients.forEach((client) => {
-      if (client.readyState === WebSocket.OPEN) {
-        client.send(text);
+  if (uuidMatch) {
+    // ── Viewer connection ─────────────────────────────────────────────────
+    const namespace = uuidMatch[1].toLowerCase();
+    if (!namespaceViewers.has(namespace)) {
+      namespaceViewers.set(namespace, new Set());
+    }
+    namespaceViewers.get(namespace).add(ws);
+    console.log(`Viewer connected    | namespace: ${namespace}`);
+
+    ws.send(JSON.stringify({
+      type: 'info',
+      args: [`Connected to NoConsole streamer | namespace: ${namespace}`],
+      timestamp: Date.now(),
+      id: crypto.randomUUID(),
+    }));
+
+    ws.on('close', () => {
+      const viewers = namespaceViewers.get(namespace);
+      if (viewers) {
+        viewers.delete(ws);
+        if (viewers.size === 0 && !activeLoggers.has(namespace)) {
+          namespaceViewers.delete(namespace);
+        }
+      }
+      console.log(`Viewer disconnected | namespace: ${namespace}`);
+    });
+
+    ws.on('error', (error) => {
+      console.error('Viewer WebSocket error:', error);
+    });
+  } else {
+    // ── Logger connection ─────────────────────────────────────────────────
+    const namespace = crypto.randomUUID();
+    activeLoggers.add(namespace);
+    namespaceViewers.set(namespace, new Set());
+    console.log(`Logger connected    | namespace: ${namespace}`);
+    console.log(`View logs at:         http://localhost:${PORT}/${namespace}`);
+
+    const host = req.headers.host ?? `localhost:${PORT}`;
+    const protocol = req.socket?.encrypted ? 'https' : 'http';
+    const viewerUrl = `${protocol}://${host}/${namespace}`;
+
+    ws.send(JSON.stringify({
+      type: 'namespace',
+      namespace,
+      viewerUrl,
+      timestamp: Date.now(),
+      id: crypto.randomUUID(),
+    }));
+
+    ws.on('message', (message, isBinary) => {
+      // Always relay as a UTF-8 text frame so browser clients receive a string,
+      // not a Blob/ArrayBuffer (which happens when a raw Buffer is forwarded).
+      const text = isBinary ? message.toString('utf8') : message.toString();
+      const viewers = namespaceViewers.get(namespace);
+      if (viewers) {
+        viewers.forEach((client) => {
+          if (client.readyState === WebSocket.OPEN) {
+            client.send(text);
+          }
+        });
       }
     });
-  });
 
-  ws.on('close', () => {
-    console.log('Client disconnected');
-  });
+    ws.on('close', () => {
+      activeLoggers.delete(namespace);
+      const viewers = namespaceViewers.get(namespace);
+      if (viewers && viewers.size === 0) {
+        namespaceViewers.delete(namespace);
+      }
+      console.log(`Logger disconnected | namespace: ${namespace}`);
+    });
 
-  ws.on('error', (error) => {
-    console.error('WebSocket error:', error);
-  });
-
-  // Send a welcome message
-  ws.send(JSON.stringify({
-    type: 'info',
-    args: ['Connected to NoConsole streamer'],
-    timestamp: Date.now(),
-    id: crypto.randomUUID(),
-  }));
+    ws.on('error', (error) => {
+      console.error('Logger WebSocket error:', error);
+    });
+  }
 });

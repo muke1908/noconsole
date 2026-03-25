@@ -12,6 +12,19 @@ export class WebSocketLogger implements Console {
 
   constructor(url: string | URL) {
     this.ws = new WebSocket(url);
+    this.ws.onmessage = (event) => {
+      try {
+        const data = typeof event.data === 'string' ? event.data : '';
+        const message = JSON.parse(data);
+        if (message.type === 'namespace' && message.viewerUrl) {
+          // Print to the real console so the developer knows which URL to open
+          // eslint-disable-next-line no-console
+          console.log(`[NoConsole] View logs at: ${message.viewerUrl}`);
+        }
+      } catch {
+        // Ignore unparseable server messages
+      }
+    };
   }
 
   private send(type: LogMessage['type'], ...args: any[]) {
