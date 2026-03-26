@@ -9,6 +9,8 @@ interface HeaderProps {
   onExportLogs: () => void;
   onToggleLLMPanel: () => void;
   llmPanelOpen: boolean;
+  viewMode: 'list' | 'bucket';
+  onToggleViewMode: () => void;
 }
 
 export function Header({
@@ -19,6 +21,8 @@ export function Header({
   onExportLogs,
   onToggleLLMPanel,
   llmPanelOpen,
+  viewMode,
+  onToggleViewMode,
 }: HeaderProps) {
   return (
     <header className="bg-[#161b22] border-b border-gray-700 px-6 py-4">
@@ -31,6 +35,18 @@ export function Header({
         </div>
 
         <div className="flex items-center gap-3">
+          <button
+            onClick={onToggleViewMode}
+            className={`px-4 py-2 rounded-md font-medium transition-colors ${
+              viewMode === 'bucket'
+                ? 'bg-blue-600 hover:bg-blue-700 text-white'
+                : 'bg-gray-700 hover:bg-gray-600 text-gray-200'
+            }`}
+            title={viewMode === 'bucket' ? 'Switch to list view' : 'Switch to bucket view'}
+          >
+            {viewMode === 'bucket' ? '☰ List' : '⊞ Bucket'}
+          </button>
+
           <button
             onClick={onTogglePause}
             className={`px-4 py-2 rounded-md font-medium transition-colors ${

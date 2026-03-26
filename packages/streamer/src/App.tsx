@@ -3,21 +3,26 @@ import { useWebSocket } from './hooks/useWebSocket';
 import { Header } from './components/Header';
 import { FilterBar } from './components/FilterBar';
 import { LogViewer } from './components/LogViewer';
+import { BucketViewer } from './components/BucketViewer';
 import { LLMPanel } from './components/LLMPanel';
 import { NamespaceLanding } from './components/NamespaceLanding';
 import type { FilterState, LogLevel } from './types';
 
 const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-const UUID_PATH_RE = /^\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\/?$/i;
+// Accept both UUID-style and origin-hostname-style namespaces (e.g. www.domain1.com)
+const NAMESPACE_PATH_RE = /^\/([a-zA-Z0-9][a-zA-Z0-9._-]+)\/?$/i;
 
 function getNamespaceFromPath(): string | null {
-  const match = window.location.pathname.match(UUID_PATH_RE);
+  const match = window.location.pathname.match(NAMESPACE_PATH_RE);
   return match ? match[1].toLowerCase() : null;
 }
+
+type ViewMode = 'list' | 'bucket';
 
 function LogConsole({ wsUrl }: { wsUrl: string }) {
   const { logs, status, isPaused, togglePause, clearLogs } = useWebSocket(wsUrl);
   const [llmPanelOpen, setLlmPanelOpen] = useState(false);
+  const [viewMode, setViewMode] = useState<ViewMode>('list');
   const [filter, setFilter] = useState<FilterState>({
     levels: new Set<LogLevel>(['log', 'info', 'warn', 'error', 'debug']),
     searchText: '',
@@ -46,12 +51,22 @@ function LogConsole({ wsUrl }: { wsUrl: string }) {
         onExportLogs={handleExportLogs}
         onToggleLLMPanel={() => setLlmPanelOpen(!llmPanelOpen)}
         llmPanelOpen={llmPanelOpen}
+        viewMode={viewMode}
+        onToggleViewMode={() => setViewMode(v => v === 'list' ? 'bucket' : 'list')}
       />
 
       <FilterBar filter={filter} onFilterChange={setFilter} />
 
       <div className="flex-1 flex overflow-hidden relative">
-        <LogViewer logs={logs} filter={filter} />
+        {viewMode === 'list' ? (
+          <LogViewer logs={logs} filter={filter} />
+        ) : (
+          <BucketViewer
+            logs={logs}
+            searchText={filter.searchText}
+            caseSensitive={filter.caseSensitive}
+          />
+        )}
         <LLMPanel
           logs={logs}
           isOpen={llmPanelOpen}
