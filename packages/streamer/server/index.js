@@ -23,13 +23,28 @@ const MIME_TYPES = {
 };
 
 // Namespace management
-// Map from namespace UUID → Set of viewer WebSocket connections
+// Map from namespace → Set of viewer WebSocket connections
 const namespaceViewers = new Map();
-// Set of namespace UUIDs that currently have an active logger connection
-const activeLoggers = new Set();
+// Map from namespace → count of active logger connections
+const activeLoggerCounts = new Map();
 
-// UUID pattern used to identify viewer connections by URL path
-const UUID_PATH_RE = /^\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\/?$/i;
+// Pattern used to identify viewer connections by URL path.
+// Matches namespace slugs that are either UUIDs or origin hostnames (e.g. www.domain1.com).
+const NAMESPACE_PATH_RE = /^\/([a-zA-Z0-9](?:[a-zA-Z0-9._-]*[a-zA-Z0-9])?)\/?$/;
+
+// Valid hostname characters (no colons so IPv6 addresses fall back to UUID).
+const VALID_NAMESPACE_RE = /^[a-zA-Z0-9](?:[a-zA-Z0-9._-]*[a-zA-Z0-9])?$/;
+
+/** Derive a namespace slug from the WebSocket request's Origin header. */
+function getNamespaceFromOrigin(originHeader) {
+  if (!originHeader) return null;
+  try {
+    const { hostname } = new URL(originHeader);
+    return hostname && VALID_NAMESPACE_RE.test(hostname) ? hostname : null;
+  } catch {
+    return null;
+  }
+}
 
 // HTTP server — serves the built React client from dist/
 const server = http.createServer((req, res) => {
@@ -63,7 +78,7 @@ const server = http.createServer((req, res) => {
   // Return the list of namespaces that currently have an active logger
   if (reqUrl === '/api/namespaces') {
     res.writeHead(200, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify([...activeLoggers]));
+    res.end(JSON.stringify([...activeLoggerCounts.keys()]));
     return;
   }
 
@@ -108,11 +123,11 @@ server.listen(PORT, () => {
 
 wss.on('connection', (ws, req) => {
   const urlPath = (req.url ?? '/').split('?')[0];
-  const uuidMatch = urlPath.match(UUID_PATH_RE);
+  const namespaceMatch = urlPath.match(NAMESPACE_PATH_RE);
 
-  if (uuidMatch) {
+  if (namespaceMatch) {
     // ── Viewer connection ─────────────────────────────────────────────────
-    const namespace = uuidMatch[1].toLowerCase();
+    const namespace = namespaceMatch[1].toLowerCase();
     if (!namespaceViewers.has(namespace)) {
       namespaceViewers.set(namespace, new Set());
     }
@@ -130,7 +145,7 @@ wss.on('connection', (ws, req) => {
       const viewers = namespaceViewers.get(namespace);
       if (viewers) {
         viewers.delete(ws);
-        if (viewers.size === 0 && !activeLoggers.has(namespace)) {
+        if (viewers.size === 0 && !activeLoggerCounts.has(namespace)) {
           namespaceViewers.delete(namespace);
         }
       }
@@ -142,9 +157,16 @@ wss.on('connection', (ws, req) => {
     });
   } else {
     // ── Logger connection ─────────────────────────────────────────────────
-    const namespace = crypto.randomUUID();
-    activeLoggers.add(namespace);
-    namespaceViewers.set(namespace, new Set());
+    // Derive namespace from the Origin header so that all connections from
+    // the same origin share one namespace.  Fall back to a UUID when the
+    // header is absent (e.g. Node.js clients) or contains an unusable value.
+    const originNamespace = getNamespaceFromOrigin(req.headers.origin);
+    const namespace = originNamespace ?? crypto.randomUUID();
+
+    activeLoggerCounts.set(namespace, (activeLoggerCounts.get(namespace) ?? 0) + 1);
+    if (!namespaceViewers.has(namespace)) {
+      namespaceViewers.set(namespace, new Set());
+    }
     console.log(`Logger connected    | namespace: ${namespace}`);
     console.log(`View logs at:         http://localhost:${PORT}/${namespace}`);
 
@@ -175,10 +197,15 @@ wss.on('connection', (ws, req) => {
     });
 
     ws.on('close', () => {
-      activeLoggers.delete(namespace);
-      const viewers = namespaceViewers.get(namespace);
-      if (viewers && viewers.size === 0) {
-        namespaceViewers.delete(namespace);
+      const count = (activeLoggerCounts.get(namespace) ?? 1) - 1;
+      if (count <= 0) {
+        activeLoggerCounts.delete(namespace);
+        const viewers = namespaceViewers.get(namespace);
+        if (viewers && viewers.size === 0) {
+          namespaceViewers.delete(namespace);
+        }
+      } else {
+        activeLoggerCounts.set(namespace, count);
       }
       console.log(`Logger disconnected | namespace: ${namespace}`);
     });
