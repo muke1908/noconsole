@@ -4,13 +4,19 @@ import { Header } from './components/Header';
 import { FilterBar } from './components/FilterBar';
 import { LogViewer } from './components/LogViewer';
 import { LLMPanel } from './components/LLMPanel';
+import { NamespaceLanding } from './components/NamespaceLanding';
 import type { FilterState, LogLevel } from './types';
 
 const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-const DEFAULT_WS_URL = `${wsProtocol}//${window.location.host}`;
+const UUID_PATH_RE = /^\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\/?$/i;
 
-function App() {
-  const { logs, status, isPaused, togglePause, clearLogs } = useWebSocket(DEFAULT_WS_URL);
+function getNamespaceFromPath(): string | null {
+  const match = window.location.pathname.match(UUID_PATH_RE);
+  return match ? match[1].toLowerCase() : null;
+}
+
+function LogConsole({ wsUrl }: { wsUrl: string }) {
+  const { logs, status, isPaused, togglePause, clearLogs } = useWebSocket(wsUrl);
   const [llmPanelOpen, setLlmPanelOpen] = useState(false);
   const [filter, setFilter] = useState<FilterState>({
     levels: new Set<LogLevel>(['log', 'info', 'warn', 'error', 'debug']),
@@ -21,9 +27,9 @@ function App() {
   const handleExportLogs = () => {
     const dataStr = JSON.stringify(logs, null, 2);
     const dataUri = 'data:application/json;charset=utf-8,' + encodeURIComponent(dataStr);
-    
+
     const exportFileDefaultName = `logs-${new Date().toISOString()}.json`;
-    
+
     const linkElement = document.createElement('a');
     linkElement.setAttribute('href', dataUri);
     linkElement.setAttribute('download', exportFileDefaultName);
@@ -41,19 +47,30 @@ function App() {
         onToggleLLMPanel={() => setLlmPanelOpen(!llmPanelOpen)}
         llmPanelOpen={llmPanelOpen}
       />
-      
+
       <FilterBar filter={filter} onFilterChange={setFilter} />
-      
+
       <div className="flex-1 flex overflow-hidden relative">
         <LogViewer logs={logs} filter={filter} />
-        <LLMPanel 
-          logs={logs} 
-          isOpen={llmPanelOpen} 
-          onClose={() => setLlmPanelOpen(false)} 
+        <LLMPanel
+          logs={logs}
+          isOpen={llmPanelOpen}
+          onClose={() => setLlmPanelOpen(false)}
         />
       </div>
     </div>
   );
+}
+
+function App() {
+  const namespace = getNamespaceFromPath();
+
+  if (!namespace) {
+    return <NamespaceLanding />;
+  }
+
+  const wsUrl = `${wsProtocol}//${window.location.host}/${namespace}`;
+  return <LogConsole wsUrl={wsUrl} />;
 }
 
 export default App;
