@@ -44,7 +44,10 @@ function getNamespaceFromOrigin(originHeader) {
   if (!originHeader) return null;
   try {
     const { protocol, hostname, port } = new URL(originHeader);
-    const scheme = protocol.replace(':', ''); // strip trailing colon
+    const scheme = protocol.slice(0, -1); // strip trailing colon, e.g. "http:" → "http"
+    // The URL API normalises default ports (80/443) to an empty string, so two
+    // origins that differ only by the explicit presence of the default port
+    // (e.g. http://host and http://host:80) produce the same namespace.
     const namespace = port
       ? `${scheme}-${hostname}-${port}`
       : `${scheme}-${hostname}`;
