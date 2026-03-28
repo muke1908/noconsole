@@ -9,7 +9,7 @@ import { NamespaceLanding } from './components/NamespaceLanding';
 import type { FilterState, LogLevel } from './types';
 
 const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-// Accept both UUID-style and origin-hostname-style namespaces (e.g. www.domain1.com)
+// Accept both UUID-style and url-based namespaces (e.g. https-www.domain1.com-3000)
 const NAMESPACE_PATH_RE = /^\/([a-zA-Z0-9][a-zA-Z0-9._-]+)\/?$/i;
 
 function getNamespaceFromPath(): string | null {

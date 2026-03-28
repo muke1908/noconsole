@@ -29,18 +29,26 @@ const namespaceViewers = new Map();
 const activeLoggerCounts = new Map();
 
 // Pattern used to identify viewer connections by URL path.
-// Matches namespace slugs that are either UUIDs or origin hostnames (e.g. www.domain1.com).
+// Matches namespace slugs that are either UUIDs or url-based slugs (e.g. https-www.domain1.com-3000).
 const NAMESPACE_PATH_RE = /^\/([a-zA-Z0-9](?:[a-zA-Z0-9._-]*[a-zA-Z0-9])?)\/?$/;
 
-// Valid hostname characters (no colons so IPv6 addresses fall back to UUID).
+// Valid namespace characters (no colons so IPv6 addresses fall back to UUID).
 const VALID_NAMESPACE_RE = /^[a-zA-Z0-9](?:[a-zA-Z0-9._-]*[a-zA-Z0-9])?$/;
 
-/** Derive a namespace slug from the WebSocket request's Origin header. */
+/** Derive a namespace slug from the WebSocket request's Origin header.
+ *  Uses the full URL (scheme + hostname + port) so that different origins
+ *  on the same host (e.g. http://localhost:3000 vs http://localhost:4000)
+ *  receive distinct namespaces.
+ */
 function getNamespaceFromOrigin(originHeader) {
   if (!originHeader) return null;
   try {
-    const { hostname } = new URL(originHeader);
-    return hostname && VALID_NAMESPACE_RE.test(hostname) ? hostname : null;
+    const { protocol, hostname, port } = new URL(originHeader);
+    const scheme = protocol.replace(':', ''); // strip trailing colon
+    const namespace = port
+      ? `${scheme}-${hostname}-${port}`
+      : `${scheme}-${hostname}`;
+    return VALID_NAMESPACE_RE.test(namespace) ? namespace : null;
   } catch {
     return null;
   }
@@ -158,7 +166,9 @@ wss.on('connection', (ws, req) => {
   } else {
     // ── Logger connection ─────────────────────────────────────────────────
     // Derive namespace from the Origin header so that all connections from
-    // the same origin share one namespace.  Fall back to a UUID when the
+    // the same origin share one namespace.  The full URL (scheme + hostname +
+    // port) is encoded into a path-safe slug so that different ports on the
+    // same host get distinct namespaces.  Fall back to a UUID when the
     // header is absent (e.g. Node.js clients) or contains an unusable value.
     const originNamespace = getNamespaceFromOrigin(req.headers.origin);
     const namespace = originNamespace ?? crypto.randomUUID();
